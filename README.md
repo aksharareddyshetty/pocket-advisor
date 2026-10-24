@@ -13,7 +13,7 @@ send the exact moment in an immigration attorney's video that explains the issue
 - **Classes, for every student.** Reads what's left on the degree audit, searches next term's classes, and builds
   a conflict-free schedule under the credit cap that favors classes filling two requirements at once.
 
-Works at any US school. Arizona State University is fully mapped as the worked example.
+Finds official guidance for US universities, with ASU as the worked example. Other schools and session-specific enrollment rules need verification. Monitoring requires consent and connected accounts; silence is not an all-clear.
 
 ## Install
 
@@ -45,3 +45,13 @@ python3 scripts/clips.py --sample
 
 Pocket Advisor gives general information, not legal advice. Your international office (DSO) and academic advisor
 have the final word.
+
+## Local checks
+
+Run `python3 -m unittest discover -s tests -v`. Tests use temporary state and no real student accounts.
+Cubbie’s email, reminder and browser flows still need testing on a real Cubbie account.
+
+Visa calculators separate school requests from USCIS filing. Supply the confirmed recommendation date with
+`--opt-i20-date` or `--stem-i20-date` for a personal deadline. An unknown date produces a null deadline.
+Enrollment checks require course modes and dates; short sessions remain provisional for DSO review.
+Watcher changes stay pending until `ack`; email checks use `seen` then `seen --mark` after successful handling.

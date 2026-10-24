@@ -23,7 +23,7 @@ QTRS, MATH, AMIT, CIVI, GCSI, SUST, plus "Major core", "Minor", "Electives").
 2. Search the courses that fill the open requirements: for general education use the category filter
    (ASU: General Studies filter in Advanced Search), for the major use the courses on the major map.
 3. For each candidate section record course code, title, section or class number, credits, mode (in_person,
-   hybrid, immersion, icourse, sync), days, start and end time, seats open, and every requirement it fills.
+   hybrid, immersion, icourse, sync), days, start and end time, seats open, start_date/end_date for the session, and every requirement it fills. Include all required lecture/lab meetings; if the input cannot represent them, do not claim the schedule is conflict-free.
 4. Look for **two-for-one** classes: a course that is on the major map and also carries a general education tag,
    or carries two tags. For example, an economics class that is also tagged SUST. Check the course's catalog page
    to see every requirement it carries.
@@ -38,7 +38,9 @@ Collect 15 to 40 sections; more makes the script slow and the choices noisy.
 - F-1 students: `min_credits` 12 (undergraduate) and the school's in-person rule (ASU: `min_in_person` 9),
   `max_online_credits` 3. Others: `min_credits` 12 if they want to stay full-time, else leave it out.
 - `avoid_times`: work shifts and practices from Google Calendar, or what the student says.
-- `must_take`: courses the student or the audit says must happen this term.
+- `must_take`: hard requirements; do not return a plan omitting them.
+- `term_start`, `term_end`, and each course’s `start_date`/`end_date`: verified dates. Missing dates or short-session combinations make the enrollment result provisional.
+- Collect every section’s delivery mode; missing or unrecognized modes cannot establish F-1 enrollment.
 
 ## 4. Run and reply
 
@@ -48,12 +50,12 @@ Write the JSON to a file in the sandbox and run:
 python3 scripts/plan_schedule.py --input plan.json --top 3
 ```
 
-Text option 1 first: the classes with days and times, which ones are two-for-one, credits, and what stays open.
+Check `enrollment_check` first: if `full_time` is null, explain the missing/session-specific information and require DSO confirmation. Text option 1 first: the classes with days and times, which ones are two-for-one, credits, and what stays open.
 Offer options 2 and 3 in one line. If the student wants all of it in one place, make a PDF or a calendar (.ics)
 file of the chosen schedule.
 
 Exit code 3 means nothing fits: say which limit blocked it (busy times, full sections, the credit cap, the
-in-person rule) and offer to loosen one.
+in-person rule) and adjust preferences or candidate sections. Required courses and visa rules are not preferences to loosen. A search-limit result is incomplete, not proof no schedule exists.
 
 ## 5. Share with friends
 

@@ -5,7 +5,7 @@
           python3 scripts/watch.py rules --watchlist ~/.config/pocket-advisor/watchlist.json
           python3 scripts/watch.py rules --sample
   seen    Remember items a check-in already handled, so the student is never texted twice about one thing.
-          python3 scripts/watch.py seen --kind email --id "<message id>"     exit 0 = new (now recorded), 1 = seen before
+          python3 scripts/watch.py seen --kind email --id "<message id>"     exit 0 = pending, 1 = handled; --mark acknowledges successful handling
   add     Add a page to the watchlist.
           python3 scripts/watch.py add --name "ISSC CPT" --url https://issc.asu.edu/f-1j-1-students/employment/f1-cpt
 
@@ -28,7 +28,6 @@ from pathlib import Path
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 STATE = Path.home() / ".config" / "pocket-advisor"
 UA = "Mozilla/5.0 (compatible; PocketAdvisor/1.0; +https://github.com/aksharareddyshetty/pocket-advisor)"
-MAX_CHANGED_LINES = 12
 
 
 def fail(msg):
@@ -65,8 +64,8 @@ def page_text(html):
     p = TextOnly()
     p.feed(html)
     lines = (re.sub(r"\s+", " ", line).strip() for line in "".join(p.out).splitlines())
-    # Drop short boilerplate fragments and dates that change on every load.
-    return "\n".join(l for l in lines if len(l) > 3 and not re.fullmatch(r"(last updated|updated)[: ].{0,40}", l, re.I))
+    # Short table cells (20 vs 40 hours) and dates can be consequential changes.
+    return "\n".join(line for line in lines if line)
 
 
 def fetch(url):
@@ -91,13 +90,12 @@ def load_watchlist(path):
 
 def rules(args):
     if args.sample:
-        state = Path(tempfile.mkdtemp()) / "snapshots"
-        pages = [("Sample: school CPT page", (ASSETS / "sample_page_before.html").read_text()),
-                 ("Sample: school CPT page", (ASSETS / "sample_page_after.html").read_text())]
-        reports = []
-        for name, html in pages:
-            reports = [compare(state, name, "https://example.edu/cpt", html)]
-        return print_report(args, reports, [])
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "snapshots"
+            name, url = "Sample: school CPT page", "https://example.edu/cpt"
+            compare(state, name, url, (ASSETS / "sample_page_before.html").read_text())
+            report = compare(state, name, url, (ASSETS / "sample_page_after.html").read_text())
+            return print_report(args, [report], [])
 
     state = STATE / "snapshots"
     reports, errors = [], []
@@ -108,7 +106,10 @@ def rules(args):
         except Exception as e:  # network errors, HTTP errors, bad URLs
             errors.append({"name": name, "url": item["url"], "error": str(e)[:160]})
             continue
-        reports.append(compare(state, name, item["url"], html))
+        try:
+            reports.append(compare(state, name, item["url"], html))
+        except ValueError as e:
+            errors.append({"name": name, "url": item["url"], "error": str(e)})
     print_report(args, reports, errors)
     if errors:
         sys.exit(4)
@@ -120,24 +121,60 @@ def compare(state, name, url, html):
     snap = state / f"{key}.txt"
     meta = state / f"{key}.json"
     new = page_text(html)
+    if not new.strip():
+        raise ValueError("page has no readable content; baseline was not changed")
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     if not snap.exists():
-        snap.write_text(new)
-        meta.write_text(json.dumps({"name": name, "url": url, "first_seen": now, "last_changed": None}))
+        atomic_text(snap, new)
+        atomic_json(meta, {"name": name, "url": url, "first_seen": now, "last_changed": None})
         return {"name": name, "url": url, "status": "baseline"}
     old = snap.read_text()
     if old == new:
+        (state / f"{key}.pending.json").unlink(missing_ok=True)
         return {"name": name, "url": url, "status": "unchanged"}
     diff = list(difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="", n=0))
-    added = [l[1:] for l in diff if l.startswith("+") and not l.startswith("+++")]
-    removed = [l[1:] for l in diff if l.startswith("-") and not l.startswith("---")]
-    snap.write_text(new)
-    info = json.loads(meta.read_text()) if meta.exists() else {"name": name, "url": url}
-    info["last_changed"] = now
-    meta.write_text(json.dumps(info))
-    return {"name": name, "url": url, "status": "changed",
-            "added": added[:MAX_CHANGED_LINES], "removed": removed[:MAX_CHANGED_LINES],
-            "more": max(0, len(added) + len(removed) - 2 * MAX_CHANGED_LINES)}
+    added = [l[1:] for l in diff[2:] if l.startswith("+")]
+    removed = [l[1:] for l in diff[2:] if l.startswith("-")]
+    revision = hashlib.sha256(new.encode()).hexdigest()
+    # Keep the acknowledged baseline until Cubbie has reviewed the full diff.
+    pending = state / f"{key}.pending.json"
+    atomic_json(pending, {"name": name, "url": url, "revision": revision, "text": new})
+    return {"name": name, "url": url, "status": "changed", "revision": revision,
+            "added": added, "removed": removed, "more": 0}
+
+
+def atomic_text(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+        try:
+            handle.write(value)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
+    temporary.replace(path)
+
+
+def atomic_json(path, value):
+    atomic_text(path, json.dumps(value))
+
+
+def ack(args):
+    state = STATE / "snapshots"
+    key = hashlib.sha1(args.url.encode()).hexdigest()[:16]
+    pending = state / f"{key}.pending.json"
+    if not pending.exists():
+        fail("no pending change for that URL")
+    info = json.loads(pending.read_text())
+    if info["revision"] != args.revision:
+        fail("page changed again; review the latest diff before acknowledging")
+    snap = state / f"{key}.txt"
+    # The pending revision is durable, so an interruption here is safe to retry.
+    atomic_text(snap, info["text"])
+    atomic_json(state / f"{key}.json", {"name": info["name"], "url": args.url,
+                "last_reviewed": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+    pending.unlink()
+    print("Reviewed change acknowledged.")
 
 
 def print_report(args, reports, errors):
@@ -149,7 +186,7 @@ def print_report(args, reports, errors):
         base = sum(1 for r in reports if r["status"] == "baseline")
         print(f"No changes on {len(reports)} watched pages" + (f" ({base} saved for the first time)." if base else "."))
     for r in changed:
-        print(f"CHANGED: {r['name']}\n{r['url']}")
+        print(f"CHANGED: {r['name']}\n{r['url']}\nRevision: {r['revision']}")
         for l in r["added"]:
             print(f"  + {l}")
         for l in r["removed"]:
@@ -170,13 +207,32 @@ def seen(args):
     if args.id in bucket:
         print(f"Already handled on {bucket[args.id]}.")
         sys.exit(1)
-    bucket[args.id] = datetime.now(timezone.utc).date().isoformat()
-    # Keep the file small: the newest 500 per kind.
+    pending_path = STATE / "pending-items.json"
+    pending = json.loads(pending_path.read_text()) if pending_path.exists() else {}
+    waiting = pending.setdefault(args.kind, {})
+    if not args.mark:
+        waiting.setdefault(args.id, datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        atomic_json(pending_path, pending)
+        print("Pending. Process this item, then run seen with --mark only after successful handling.")
+        return
+    bucket[args.id] = datetime.now(timezone.utc).isoformat(timespec="microseconds")
     if len(bucket) > 500:
         for k in sorted(bucket, key=bucket.get)[: len(bucket) - 500]:
             del bucket[k]
-    path.write_text(json.dumps(data))
-    print("New. Recorded.")
+    # Save completion first: a crash before queue cleanup cannot redeliver it.
+    atomic_json(path, data)
+    waiting.pop(args.id, None)
+    atomic_json(pending_path, pending)
+    print("Handled. Recorded.")
+
+
+def pending_items(args):
+    path = STATE / "pending-items.json"
+    data = json.loads(path.read_text()) if path.exists() else {}
+    handled_path = STATE / "seen.json"
+    handled = json.loads(handled_path.read_text()) if handled_path.exists() else {}
+    print(json.dumps([item for item in data.get(args.kind, {})
+                      if item not in handled.get(args.kind, {})]))
 
 
 def add(args):
@@ -207,7 +263,17 @@ def main():
     sp = sub.add_parser("seen")
     sp.add_argument("--kind", help="email, calendar, canvas, rule ...")
     sp.add_argument("--id")
+    sp.add_argument("--mark", action="store_true", help="acknowledge only after successful handling")
     sp.set_defaults(fn=seen)
+
+    sp = sub.add_parser("pending")
+    sp.add_argument("--kind", required=True)
+    sp.set_defaults(fn=pending_items)
+
+    sp = sub.add_parser("ack")
+    sp.add_argument("--url", required=True)
+    sp.add_argument("--revision", required=True)
+    sp.set_defaults(fn=ack)
 
     sp = sub.add_parser("add")
     sp.add_argument("--name")

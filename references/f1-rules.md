@@ -42,22 +42,20 @@ Primary sources:
 
 ## 2. Can I take this job?
 
-Work through these in order and stop at the first answer.
+Use these to identify questions and possible routes, not to certify permission to work. Read current official sources and confirm unresolved eligibility with the DSO.
 
 1. Is the student on F-1? If J-1 or another status, say these steps are for F-1 and send them to their
    international office.
 2. Has the student finished their program (degree conferred, or past the program end date on the I-20)?
-   - Yes: the only route is post-completion OPT (section 5) or STEM OPT (section 6). They need the EAD card in hand
-     and its start date reached.
+   - Yes: post-completion OPT (section 5) or STEM OPT (section 6) may be relevant. Other circumstances need DSO review; do not claim these are the only possible authorizations. Verify the applicable authorization and start conditions.
 3. Is the employer the school itself, or a business on campus that serves students (bookstore, dining, campus
-   cafe)? That is on-campus work (section 3).
+   cafe)? That may qualify as on-campus work (section 3); verify the position with the school rather than classifying it by street address alone.
 4. Anything else is off-campus. Before graduation that needs CPT (section 4) or pre-completion OPT, authorized
    before the first day of work.
 5. Unpaid internships, volunteering for a company, remote work for any employer while in the US, freelance,
    gig apps and paid social posts: treat as needing authorization and send them to their DSO (section 9).
 
-Answer with one of: "On-campus, OK within the hours limit", "Needs CPT", "Needs OPT", "Not allowed yet", or
-"Ask your DSO first", plus the one-line reason and the official link.
+Explain the possible route supported by the sources, the facts still needed, and a concrete DSO question. Avoid categorical “OK” or “Needs CPT” verdicts based on incomplete facts.
 
 ## 3. On-campus work
 

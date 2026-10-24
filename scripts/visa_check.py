@@ -5,7 +5,7 @@ Cubbie passes in everything (dates, shifts, courses); this script never reads ac
 Every subcommand prints a short plain-text summary, or JSON with --json.
 Exit codes: 0 done, 2 bad input.
 
-  opt-window    --program-end DATE --today DATE [--school-lead-days 97]
+  opt-window    --program-end DATE --today DATE [--opt-i20-date DATE] [--school-lead-days 97]
   stem-window   --opt-end DATE --today DATE [--stem-i20-date DATE] [--school-lead-days 97]
   unemployment  --ead-start DATE --today DATE [--jobs FILE] [--stem]
   hours         --shifts FILE [--limit 20] [--break-limit 40] [--breaks START:END,...]
@@ -21,6 +21,7 @@ import argparse
 import json
 import sys
 from datetime import date, datetime, timedelta
+from enrollment_rules import assess
 from pathlib import Path
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
@@ -88,22 +89,35 @@ def opt_window(args):
     uscis_closes = end + timedelta(days=60)
     start_latest = end + timedelta(days=60)
 
-    if today < school_opens:
-        status = "too_early"
-        line = f"Too early. Your school can take the OPT request from {fmt(school_opens)} ({(school_opens - today).days} days away)."
-    elif today <= uscis_closes:
-        status = "open"
-        line = f"The OPT window is open. USCIS must receive the I-765 by {fmt(uscis_closes)} ({(uscis_closes - today).days} days left), and within 30 days of your OPT I-20 date."
+    recommendation = parse_date(args.opt_i20_date, "--opt-i20-date") if args.opt_i20_date else None
+    if recommendation and recommendation > today:
+        fail("OPT recommendation date cannot be in the future")
+    effective_last = min(uscis_closes, recommendation + timedelta(days=30)) if recommendation else None
+    school_status = "open" if school_opens <= today <= uscis_closes else "too_early" if today < school_opens else "closed"
+    filing_status = "too_early" if today < uscis_opens else "closed" if today > uscis_closes else "open"
+    if effective_last and today > effective_last:
+        filing_status = "closed"
+    status = filing_status
+    if filing_status == "too_early":
+        line = f"USCIS filing is not open yet; it opens {fmt(uscis_opens)}. School request status: {school_status}."
+    elif filing_status == "closed":
+        line = f"The filing window for these dates is closed. Contact your DSO about the next step."
+    elif effective_last is None:
+        line = "The general USCIS window is open. Confirm your OPT recommendation date to calculate your filing deadline."
     else:
-        status = "closed"
-        line = f"The OPT filing window closed on {fmt(uscis_closes)}. Talk to your DSO today."
+        line = f"USCIS filing window is open; deadline for these dates: {fmt(effective_last)}. Confirm with your DSO."
 
     result = {
         "status": status,
+        "school_request_status": school_status,
+        "uscis_filing_status": filing_status,
         "program_end": end,
         "school_request_opens": school_opens,
         "uscis_accepts_from": uscis_opens,
-        "uscis_last_day": uscis_closes,
+        "uscis_last_day": effective_last,
+        "general_uscis_last_day": uscis_closes,
+        "opt_recommendation_date": recommendation,
+        "deadline_complete": recommendation is not None,
         "start_date_choices": [end + timedelta(days=1), start_latest],
         "file_within_days_of_i20": 30,
     }
@@ -111,7 +125,8 @@ def opt_window(args):
         line,
         f"School request opens: {fmt(school_opens)}",
         f"USCIS accepts from: {fmt(uscis_opens)}",
-        f"Last day USCIS can receive it: {fmt(uscis_closes)} (also within 30 days of the OPT I-20 date)",
+        f"General outer deadline: {fmt(uscis_closes)}; the recommendation date may make it earlier.",
+        f"Personal filing deadline: {fmt(effective_last) if effective_last else 'unknown; provide --opt-i20-date'}",
         f"Start date you can pick: {fmt(end + timedelta(days=1))} to {fmt(start_latest)}",
     ]
     emit(args, result, lines)
@@ -131,30 +146,34 @@ def stem_window(args):
         i20 = parse_date(args.stem_i20_date, "--stem-i20-date")
         last_day = min(last_day, i20 + timedelta(days=60))
 
-    if today < school_opens:
-        status = "too_early"
-        line = f"Too early. Your school can take the STEM OPT request from {fmt(school_opens)}."
-    elif today <= last_day:
-        status = "open"
-        line = f"The STEM OPT window is open. USCIS must receive it by {fmt(last_day)} ({(last_day - today).days} days left)."
+    if args.stem_i20_date and i20 > today:
+        fail("STEM recommendation date cannot be in the future")
+    school_status = "open" if school_opens <= today < opt_end else "too_early" if today < school_opens else "closed"
+    status = "too_early" if today < uscis_opens else "closed" if today > last_day else "open"
+    line = f"USCIS STEM filing status: {status}; school request status: {school_status}."
+    if not args.stem_i20_date:
+        line += " Confirm the STEM recommendation date to calculate your personal deadline."
     else:
-        status = "closed"
-        line = f"The STEM OPT window has closed (last day {fmt(last_day)}). Talk to your DSO today."
+        line += f" Deadline for these dates: {fmt(last_day)}; confirm with your DSO."
 
     result = {
         "status": status,
+        "school_request_status": school_status,
+        "uscis_filing_status": status,
+        "deadline_complete": bool(args.stem_i20_date),
+        "general_uscis_last_day": opt_end - timedelta(days=1),
         "opt_end": opt_end,
         "school_request_opens": school_opens,
         "uscis_accepts_from": uscis_opens,
-        "uscis_last_day": last_day,
+        "uscis_last_day": last_day if args.stem_i20_date else None,
         "needs": ["employer enrolled in E-Verify", "Form I-983 signed with employer", "STEM I-20 from the DSO"],
     }
     lines = [
         line,
         f"School request opens: {fmt(school_opens)}",
         f"USCIS accepts from: {fmt(uscis_opens)}",
-        f"Last day USCIS can receive it: {fmt(last_day)}"
-        + ("" if args.stem_i20_date else " (and within 60 days of the STEM I-20 date)"),
+        (f"Personal filing deadline: {fmt(last_day)}" if args.stem_i20_date else
+         f"General outer deadline: {fmt(last_day)}; personal deadline unknown without --stem-i20-date"),
         "You need: an E-Verify employer, a signed Form I-983, and the STEM I-20.",
     ]
     emit(args, result, lines)
@@ -225,12 +244,19 @@ def hours(args):
     for s in shifts:
         start = parse_datetime(s["start"], "shift start")
         end = parse_datetime(s["end"], "shift end")
+        if start.tzinfo != end.tzinfo:
+            fail("use the same local timezone for shift start and end")
         if end <= start:
             fail(f"shift ends before it starts: {s}")
-        monday = start.date() - timedelta(days=start.weekday())
-        w = weeks.setdefault(monday, {"hours": 0.0, "jobs": set()})
-        w["hours"] += (end - start).total_seconds() / 3600
-        w["jobs"].add(s.get("job", "job"))
+        # Split at Monday midnight; do not assign an overnight shift to one week.
+        while start < end:
+            monday = start.date() - timedelta(days=start.weekday())
+            boundary = datetime.combine(monday + timedelta(days=7), datetime.min.time(), tzinfo=start.tzinfo)
+            segment_end = min(end, boundary)
+            w = weeks.setdefault(monday, {"hours": 0.0, "jobs": set()})
+            w["hours"] += (segment_end - start).total_seconds() / 3600
+            w["jobs"].add(s.get("job", "job"))
+            start = segment_end
 
     report = []
     for monday in sorted(weeks):
@@ -266,25 +292,16 @@ def enrollment(args):
     max_online = args.max_online_credits
 
     def tally(cs):
-        counted = [c for c in cs if not c.get("audit")]
-        total = sum(float(c["credits"]) for c in counted)
-        in_person = sum(float(c["credits"]) for c in counted if c.get("mode", "in_person") in IN_PERSON_MODES)
-        online = total - in_person
-        online_counted = min(online, max_online) if max_online is not None else online
-        counted_total = in_person + online_counted
-        problems = []
-        if counted_total < min_credits:
-            problems.append(f"{counted_total:g} credits count toward full-time, below the {min_credits:g} minimum")
-        if args.min_in_person is not None and in_person < args.min_in_person:
-            problems.append(f"only {in_person:g} in-person credits, below the {args.min_in_person:g} required")
-        return {"total": total, "in_person": in_person, "online": online,
-                "counts_toward_full_time": counted_total, "full_time": not problems, "problems": problems}
+        try:
+            return assess(cs, min_credits, args.min_in_person, max_online, args.term_start, args.term_end)
+        except (ValueError, KeyError, TypeError) as exc:
+            fail(f"invalid enrollment data: {exc}")
 
     now = tally(courses)
     result = {"min_credits": min_credits, "now": now}
-    lines = [("Full-time now: " if now["full_time"] else "NOT full-time now: ")
+    lines = [("Meets supplied enrollment rules: " if now["full_time"] is True else "Below minimum: " if now["full_time"] is False else "Enrollment not yet verified: ")
              + f"{now['counts_toward_full_time']:g} credits count ({now['in_person']:g} in person, {now['online']:g} online)."]
-    lines += [f"- {p}" for p in now["problems"]]
+    lines += [f"- {p}" for p in now["problems"] + now["needs_information"]]
 
     if args.drop:
         key = args.drop.replace(" ", "").lower()
@@ -293,7 +310,10 @@ def enrollment(args):
             fail(f"{args.drop} is not in the course list")
         after = tally(remaining)
         result["after_drop"] = {"dropped": args.drop, **after}
-        if after["full_time"]:
+        if after["full_time"] is None:
+            lines.append("Cannot verify enrollment after dropping; confirm missing information and session rules with your DSO before changing courses.")
+            lines += [f"- {p}" for p in after["needs_information"]]
+        elif after["full_time"]:
             lines.append(f"Dropping {args.drop} keeps you full-time ({after['counts_toward_full_time']:g} credits).")
         else:
             lines.append(f"Dropping {args.drop} takes you below full-time. Get Reduced Course Load approval from your DSO first, or swap it for another class.")
@@ -340,6 +360,7 @@ def main():
         return sp
 
     sp = common(sub.add_parser("opt-window"))
+    sp.add_argument("--opt-i20-date", help="DSO OPT recommendation date, confirmed by the student")
     sp.add_argument("--program-end")
     sp.add_argument("--today")
     sp.add_argument("--school-lead-days", type=int, default=97)
@@ -368,6 +389,8 @@ def main():
     sp.set_defaults(fn=hours)
 
     sp = common(sub.add_parser("enrollment"))
+    sp.add_argument("--term-start")
+    sp.add_argument("--term-end")
     sp.add_argument("--courses", help="JSON list of {course, credits, mode, audit?}")
     sp.add_argument("--level", choices=["undergrad", "grad"], default="undergrad")
     sp.add_argument("--min-credits", type=float)

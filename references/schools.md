@@ -1,6 +1,6 @@
 # Finding the student's school details
 
-Pocket Advisor works at any US school. Federal visa rules are the same everywhere (`f1-rules.md`), but each school
+Pocket Advisor discovers official guidance for US schools; only ASU is mapped here and every school requires live verification. Federal visa rules are the same everywhere (`f1-rules.md`), but each school
 has its own international office, forms, credit limits, class search and degree audit. Look these up once per
 student, confirm them with the student, and remember them.
 
@@ -24,9 +24,9 @@ link. Ask the student only for what the web cannot answer.
 | General education categories and whether one course can count for two | Academic catalog general education page |
 
 Save the profile in memory as "Pocket Advisor school profile: <school>", with each link and the date it was read.
-Refresh any item older than 90 days before relying on it.
+Cache stable office names and navigation links for up to 90 days. Re-read current policy, dates, fees, enrollment rules and forms on every consequential answer or alarm calculation, regardless of cache age. Confirm campus/program applicability; do not apply ASU defaults at another school.
 
-If the school has no page for an item, say so and use the federal rule, noting that the school may differ.
+If a school page is absent or blocked, state which procedure is unverified. Read an accessible official federal source for general guidance and offer the verified international office contact; do not invent a local process or imply a school can override federal requirements.
 
 ## Worked example: Arizona State University (checked 2026-10-24)
 
