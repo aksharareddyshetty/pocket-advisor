@@ -1,0 +1,7 @@
+[
+  {"course": "CSE 230", "credits": 3, "mode": "in_person"},
+  {"course": "MAT 343", "credits": 3, "mode": "in_person"},
+  {"course": "ENG 102", "credits": 3, "mode": "hybrid"},
+  {"course": "SOS 110", "credits": 3, "mode": "icourse"},
+  {"course": "HST 109", "credits": 3, "mode": "sync"}
+]
