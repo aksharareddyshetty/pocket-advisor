@@ -23,7 +23,8 @@ QTRS, MATH, AMIT, CIVI, GCSI, SUST, plus "Major core", "Minor", "Electives").
 2. Search the courses that fill the open requirements: for general education use the category filter
    (ASU: General Studies filter in Advanced Search), for the major use the courses on the major map.
 3. For each candidate section record course code, title, section or class number, credits, mode (in_person,
-   hybrid, immersion, icourse, sync), days, start and end time, seats open, start_date/end_date for the session, and every requirement it fills. Include all required lecture/lab meetings; if the input cannot represent them, do not claim the schedule is conflict-free.
+   hybrid, immersion, icourse, sync), days, start and end time, seats open, start_date/end_date for the session, and every requirement it fills. Record every required lecture/lab/discussion in `meetings: [{days, start, end, start_date?, end_date?}]`; meeting dates inherit the section session unless specified. For a single meeting the existing top-level days/start/end fields still work. Use one representation only. Explicitly set `asynchronous: true` for confirmed online/icourse sections with no scheduled meetings. Missing times in other sections are an input error, not proof of no conflict.
+   Date ranges are inclusive: matching weekday/time only conflicts when the shared weekday actually occurs in both date ranges. Supply session dates for busy blocks too when they do not span the term. Missing dates conservatively overlap; enrollment may still need DSO review.
 4. Look for **two-for-one** classes: a course that is on the major map and also carries a general education tag,
    or carries two tags. For example, an economics class that is also tagged SUST. Check the course's catalog page
    to see every requirement it carries.

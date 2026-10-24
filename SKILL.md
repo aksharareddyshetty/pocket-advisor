@@ -143,8 +143,11 @@ python3 scripts/visa_check.py unemployment --ead-start 2027-06-15 --today 2026-1
   `uscis_last_day` is null until that date is supplied; `general_uscis_last_day` is only an outer limit.
   School-request and USCIS-filing statuses are separate; an open school request is not permission to file.
 - `--school-lead-days` is how early the school takes requests (ASU: 97, the default); verify and override for other schools.
-- `unemployment` takes jobs as `[{employer, start, end?, hours_per_week}]`; jobs under 20 hours a week count as
-  unemployed. Add `--stem` for the 150-day limit, and `--prior-days` for days used before the STEM extension.
+- `unemployment` takes qualifying jobs as `[{employer, start, end?, hours_per_week, qualifying?}]`.
+  Confirm job eligibility with the student/DSO; the calculator checks supplied dates and hours, not authorization.
+  Regular post-completion OPT combines weekly hours across jobs active on the same dates; nonoverlapping jobs
+  do not combine. Explicit `qualifying: false` excludes a role. STEM requires at least 20 hours per employer.
+  Add `--stem` for the STEM calculation and 150-day limit, and `--prior-days` for days used before the extension.
 - Offer check-ins with the student's yes: when the school request opens, 14 days before the calculated personal deadline, and a
   weekly unemployment count while on OPT. Word each one so it makes sense later, for example "Pocket Advisor: OPT
   request opens today at ISSC. Program end May 8, 2027."
@@ -203,7 +206,10 @@ Read `references/course-planning.md` and follow it. In short:
 2. Find next term's sections in the school's class search, especially two-for-one classes.
 3. Set the credit cap, target credits, F-1 rules if they apply, and busy times from Google Calendar.
 4. Run `python3 scripts/plan_schedule.py --input plan.json --top 3` and text option 1.
-5. Offer the share card as a draft the student can send to friends.
+5. Collect every lecture, lab and discussion meeting in a `meetings` list or supply the single meeting
+   with top-level `days`, `start`, `end`. Provide session dates and mark confirmed asynchronous online sections
+   with `asynchronous: true`. Missing times require clarification; never label an in-person class as online.
+6. Offer the share card as a draft the student can send to friends.
 
 Required courses, conflicts and credit limits are hard constraints. For F-1 students, supply verified
 `min_credits`, `min_in_person`, `max_online_credits`, `term_start`, `term_end`, course modes and session dates.

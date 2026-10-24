@@ -19,11 +19,14 @@ Input fields (see assets/sample_plan.json):
   avoid_times       optional, list of {days, start, end, label} the student is busy (work, practice)
   sections          list of {course, title, section, credits, mode, days, start, end, satisfies, seats_open?}
                     days like "MWF" or "TTh"; times "HH:MM" 24-hour; satisfies lists requirement ids;
-                    leave days empty for online classes with no meeting time
+                    provide days/start/end, or meetings: [{days,start,end,start_date?,end_date?}];
+                    use asynchronous:true only for confirmed online/icourse sections without meetings;
+                    start_date/end_date bound the session (missing bounds conservatively overlap)
 
 Exit codes: 0 done, 2 bad input, 3 no schedule fits.
 """
 
+from datetime import date
 import argparse
 import json
 import re
@@ -67,20 +70,90 @@ def minutes(hhmm, name):
     return hour * 60 + minute
 
 
+def session_dates(item, name):
+    try:
+        first = date.fromisoformat(item["start_date"]) if item.get("start_date") else date.min
+        last = date.fromisoformat(item["end_date"]) if item.get("end_date") else date.max
+    except (TypeError, ValueError):
+        fail(f"{name} session dates must be YYYY-MM-DD")
+    if first > last:
+        fail(f"{name} session must end on or after it starts")
+    return first, last
+
+
 def meeting(item, name):
     if not item.get("days"):
-        return None
+        fail(f"confirm meeting days and times for {name}")
     start = minutes(item.get("start"), f"{name} start")
     end = minutes(item.get("end"), f"{name} end")
     if end <= start:
         fail(f"{name} meeting must end after it starts")
-    return (parse_days(item["days"]), start, end)
+    first, last = session_dates(item, name)
+    days = parse_days(item["days"])
+    if not days:
+        fail(f"confirm meeting days for {name}")
+    return (days, start, end, first, last)
+
+
+def section_meetings(section):
+    name = f"section {section['course']}"
+    session_dates(section, name)
+    if section.get("asynchronous") is True:
+        if section.get("mode") not in {"online", "icourse"}:
+            fail(f"{name}: only an explicitly asynchronous online section can have no meetings")
+        if section.get("days") or section.get("meetings") or section.get("start") or section.get("end"):
+            fail(f"{name}: asynchronous conflicts with supplied meeting times")
+        return []
+    if "meetings" not in section:
+        return [meeting(section, name)]
+    if any(section.get(key) for key in ("days", "start", "end")):
+        fail(f"{name}: use meetings or top-level times, not both")
+    items = section["meetings"]
+    if not isinstance(items, list) or not items:
+        fail(f"{name}: provide all lecture/lab meetings or confirm asynchronous delivery")
+    result = []
+    for item in items:
+        if not isinstance(item, dict):
+            fail(f"{name}: every meeting must contain days, start and end")
+        merged = {key: section[key] for key in ("start_date", "end_date") if key in section}
+        merged.update(item)
+        first, last = session_dates(merged, name)
+        parent_first, parent_last = session_dates(section, name)
+        if first < parent_first or last > parent_last:
+            fail(f"{name}: meeting dates fall outside its session")
+        result.append(meeting(merged, name))
+    return result
+
+
+DAY_NUMBERS = {"M": 0, "T": 1, "W": 2, "R": 3, "F": 4, "S": 5, "U": 6}
 
 
 def clash(a, b):
-    if a is None or b is None:
-        return False
-    return bool(a[0] & b[0]) and a[1] < b[2] and b[1] < a[2]
+    for left in a:
+        for right in b:
+            common = left[0] & right[0]
+            if not common or left[1] >= right[2] or right[1] >= left[2]:
+                continue
+            first, last = max(left[3], right[3]), min(left[4], right[4])
+            if first > last:
+                continue
+            if any((DAY_NUMBERS[d] - first.weekday()) % 7 <= (last - first).days for d in common):
+                return True
+    return False
+
+
+def meeting_text(meetings):
+    if not meetings:
+        return "online, no set time (confirmed asynchronous)"
+    def clock(value):
+        return f"{value // 60:02d}:{value % 60:02d}"
+    descriptions = []
+    for days, start, end, first, last in meetings:
+        text = f"{''.join(d for d in DAY_NUMBERS if d in days)} {clock(start)}-{clock(end)}"
+        if first != date.min and last != date.max:
+            text += f" ({first.isoformat()} to {last.isoformat()})"
+        descriptions.append(text)
+    return "; ".join(descriptions)
 
 
 def norm(code):
@@ -105,7 +178,7 @@ def plan(data, top):
     reqs = {r["id"]: r for r in data.get("requirements", [])}
     need = {rid: int(r.get("courses_needed", 1)) for rid, r in reqs.items()}
     must = {norm(c) for c in data.get("must_take", [])}
-    avoid = [meeting(a, "avoid_times") for a in data.get("avoid_times", [])]
+    avoid = [[meeting(a, "avoid_times")] for a in data.get("avoid_times", [])]
 
     sections = []
     for i, s in enumerate(data.get("sections", [])):
@@ -113,7 +186,7 @@ def plan(data, top):
             continue
         if (min_credits or min_in_person or max_online is not None) and s.get("mode") not in IN_PERSON_MODES | {"online", "icourse", "sync"}:
             fail(f"confirm delivery mode for {s['course']} before checking enrollment")
-        m = meeting(s, f"section {s.get('course')}")
+        m = section_meetings(s)
         if any(clash(m, a) for a in avoid):
             continue
         s = dict(s, _m=m, _code=norm(s["course"]), _i=i,
@@ -230,7 +303,7 @@ def plan(data, top):
             "classes": [{
                 "course": s["course"], "title": s.get("title"), "section": s.get("section"),
                 "credits": s["credits"], "mode": s.get("mode", "unknown"),
-                "when": f"{s['days']} {s['start']}-{s['end']}" if s.get("days") else "online, no set time",
+                "when": meeting_text(s["_m"]),
                 "fills": [reqs[r].get("label", r) for r in s["_sat"] if filled[r] <= need[r]] or
                          [reqs[r].get("label", r) for r in s["_sat"]],
                 "double_counts": sum(1 for r in s["_sat"] if filled[r] <= need[r]) >= 2,
