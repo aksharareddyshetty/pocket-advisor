@@ -1,31 +1,45 @@
 ---
 name: pocket-advisor
-description: An always-available advisor for international students on F-1 visas and for any student planning classes. It answers "can I take this job?", checks full-time status before a class is dropped, tracks on-campus work hours, OPT and STEM OPT deadlines, unemployment days and travel signatures, and builds next term's schedule from the degree audit and class search, favoring classes that fill two requirements at once. Use it whenever a student mentions F-1, visa, I-20, OPT, CPT, EAD, DSO, international office, working on or off campus as an international student, dropping a class, or asks what classes to take, how to stay on track to graduate, gen eds, or credit limits. Works at any US school, with Arizona State University fully mapped. Not for study schedules (study-plan-builder) or emails to professors (email-to-professor).
+description: A proactive advisor that keeps watch for international students on F-1 visas and plans classes for any student, texting first when something needs them. After one setup chat it checks email, calendar, Canvas and official rule pages on a schedule and warns when a job offer needs CPT or OPT, a booked flight outlasts the I-20 travel signature, a visa rule changes, work hours run over, or an OPT, drop or registration deadline nears, and sends the exact moment in an immigration lawyer's video that explains it. It also answers "can I take this job?" and builds next term's schedule from the degree audit, favoring classes that fill two requirements. Use it whenever a student mentions F-1, visa, I-20, OPT, CPT, EAD, DSO, the international office, working as an international student, dropping a class, or asks what classes to take or how to stay on track to graduate. Works at any US school. Not for study schedules or emails to professors.
 ---
 
 # Pocket Advisor
 
-Advisors and international offices are booked out for weeks. Pocket Advisor answers the questions students
-text at midnight, with the official link every time, and hands anything risky to the real office with an email
-drafted and ready to send.
+Advisors and international offices are booked out for weeks, and a chatbot only helps if the student knows what to
+ask. Pocket Advisor keeps watch instead. It reads what lands in the student's inbox and calendar and what changes
+on official pages, and texts first: "That internship offer needs CPT before you say yes."
 
 It has two halves:
 
-- **Visa and work** (F-1 students): jobs, hours, full-time status, OPT, STEM OPT, travel.
+- **Visa and work** (F-1 students): job offers, hours, full-time status, OPT, STEM OPT, travel, rule changes.
 - **Classes** (every student): what to take next term so they stay on track and waste no credits.
+
+Most of its work happens in scheduled check-ins (`references/watchers.md`). It also answers questions on demand.
 
 ## When to use
 
+- Setting up: "help me stay on top of my visa stuff", "keep an eye on my F-1 status", or a first visa question.
+- A scheduled Pocket Advisor check-in fires (morning sweep, rules watch, hours preview, date or term alarm).
 - "Can I work at the campus Starbucks?" / "I got an internship offer, am I allowed to take it?"
 - "Can I drive for DoorDash on F-1?" / "A brand wants to pay me for a TikTok, is that OK?"
 - "I want to drop CSE 230." (for an F-1 student)
-- "How many hours have I worked this week?"
 - "When can I apply for OPT?" / "How many unemployment days do I have left?"
 - "I'm flying home for winter break, is my I-20 OK?"
-- "Where's my EAD approval email?"
+- "Is there a video that explains this?" / "What do immigration lawyers say about this?"
 - "What classes should I take next semester?" / "Is there a class that counts for my major and a gen ed?"
 
 Do not use it for study schedules or emails to professors; Cubbie's built-in Skills cover those.
+
+## Setup (first time only)
+
+The expert clip finder needs one package. Install it once into its own virtual environment under HOME:
+
+```bash
+python3 -m venv ~/.local/share/venvs/pocket-advisor && ~/.local/share/venvs/pocket-advisor/bin/pip install youtube-transcript-api==1.2.2
+```
+
+If `~/.local/share/venvs/pocket-advisor/bin/python` is missing later, run this again. Everything else uses only
+Python's standard library.
 
 ## Ground rules
 
@@ -38,10 +52,12 @@ Do not use it for study schedules or emails to professors; Cubbie's built-in Ski
   (an I-20 showing CPT, or an EAD in hand with its start date reached).
 - **Drafts only.** Cubbie never sends an email, submits a form or registers for classes. It drafts the email for the
   student to send, or opens the page and hands over the browser after the student says yes.
+- **Proactive, with consent.** Check-ins run only after the student says yes, text only when something needs
+  them, and stop when the student says "stop watching".
 - **Keep it private.** Remember the visa profile in Cubbie's memory only. Never put passport numbers, SEVIS IDs or
   receipt numbers into a share card or a draft to anyone but the school.
 
-## First time: build the profile
+## First time: profile, then keep watch
 
 Ask one question at a time, suggest a default, and remember each answer as "Pocket Advisor profile".
 
@@ -55,6 +71,10 @@ Ask one question at a time, suggest a default, and remember each answer as "Pock
 
 Search the student's email for the I-20, EAD or USCIS notices when they don't know a date. Read dates from those
 documents rather than guessing, and confirm them with the student.
+
+Then offer to keep watch. This is the most important step: read `references/watchers.md`, offer the bundle in one
+text, and create the check-ins the student says yes to. Build the rules watchlist and compute the date alarms in
+the same turn.
 
 ## Visa and work
 
@@ -130,6 +150,37 @@ Search the student's email for the item (USCIS receipt notice, EAD approval, I-2
 receipt) and reply with the date and a one-line summary. Never paste ID numbers into the chat unless the student
 asks for that number.
 
+## Expert clips
+
+Students would rather hear a 40-second answer from an immigration attorney than watch a 2-hour video. Use this
+when a student asks for one, when a rules-watch change is confusing, or after a "Needs CPT" or "Ask your DSO"
+verdict.
+
+1. Search the web for recent YouTube videos on the exact question by immigration attorneys or school
+   international offices, for example `"F-1 CPT first year" immigration attorney site:youtube.com`. Prefer videos
+   from the last 2 years and from named attorneys or `.edu` channels. Pick up to three video IDs.
+2. Run:
+
+   ```bash
+   ~/.local/share/venvs/pocket-advisor/bin/python scripts/clips.py --question "<the student's question>" --video <id> --video <id>
+   ```
+
+   If transcripts can't be fetched (exit code 4), open the video page in the browser, open its transcript, save
+   it to a file as lines like `12:34 text`, and run with `--transcript FILE --video-id <id>`.
+3. Read the excerpt of the best moment. Send it only if it really answers the question and agrees with the
+   official page. Text the link (it starts at that moment) with a two-line summary and the official link.
+
+```text
+Here's an immigration attorney answering exactly that, about 40 seconds:
+https://www.youtube.com/watch?v=<id>&t=135s
+
+Short version: CPT usually needs one full year of full-time study first.
+Official rule:
+https://issc.asu.edu/f-1j-1-students/employment/f1-cpt
+```
+
+A video is one attorney's general take, not advice for this student. The official page wins when they disagree.
+
 ## Classes
 
 Read `references/course-planning.md` and follow it. In short:
@@ -172,6 +223,9 @@ Want me to draft the email to your advisor?
 | Degree audit sign-in fails | Ask for a PDF or screenshot of the audit instead |
 | Script exit code 2 | Fix the input (a date or time format) and run it once more; don't retry silently |
 | plan_schedule exit code 3 | Say which limit blocked it and offer to loosen one |
+| watch.py exit code 4 | Open the page in the browser instead; mention it only if it fails two weeks running |
+| clips.py exit code 4 or 5 | Use the transcript from the browser, or skip the clip and send the official link alone |
+| A check-in can't reach email, calendar or Canvas | Text once that it's disconnected and skip that part until it's back |
 | Rules unclear or the case is unusual | Say so plainly and draft the DSO email |
 
 Never guess a date, a deadline or a rule. When unsure, say so and point to the office.

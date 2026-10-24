@@ -1,0 +1,10 @@
+0:00 Made-up sample transcript for testing scripts/clips.py. Not a real video or real advice.
+0:05 Hi everyone, welcome back. Today we're answering your questions about student visas.
+0:40 First question: can I travel abroad over winter break? You need a valid travel signature on your I-20.
+1:30 Make sure your passport is valid for six months and your visa stamp is not expired.
+2:15 Next question, a really common one: can I work off campus during my first year?
+2:22 For F-1 students, curricular practical training, CPT, usually requires one full academic year
+2:30 of full-time enrollment first. Some graduate programs require an internship right away, and then
+2:38 CPT can start in the first year. Your DSO authorizes CPT on your I-20 before you start.
+3:10 Okay, what about OPT? You can apply up to 90 days before your program end date.
+4:02 Last question: can I drive for Uber? No. Gig work is not authorized employment for F-1 students.
