@@ -19,6 +19,7 @@ Add --sample to any subcommand to run it on the bundled files in assets/.
 
 import argparse
 import json
+import math
 import sys
 from datetime import date, datetime, timedelta
 from enrollment_rules import assess
@@ -190,17 +191,36 @@ def unemployment(args):
         fail("--today is before --ead-start; the unemployment clock has not started")
     limit = 150 if args.stem else 90
 
-    employed_days = set()
     jobs = load_json(args.jobs) if args.jobs else []
+    active = []
     for job in jobs:
-        if float(job.get("hours_per_week", 0)) < 20:
-            continue  # under 20 hours a week counts as unemployed
-        start = max(parse_date(job["start"], "job start"), ead_start)
-        end = min(parse_date(job["end"], "job end") if job.get("end") else today, today)
-        d = start
-        while d <= end:
-            employed_days.add(d)
-            d += timedelta(days=1)
+        try:
+            hours = float(job.get("hours_per_week", 0))
+        except (TypeError, ValueError):
+            fail("job hours_per_week must be a finite nonnegative number")
+        if not math.isfinite(hours) or hours < 0:
+            fail("job hours_per_week must be a finite nonnegative number")
+        start = parse_date(job["start"], "job start")
+        end = parse_date(job["end"], "job end") if job.get("end") else today
+        if job.get("end") and end < start:
+            fail("job end must not precede job start")
+        if job.get("qualifying", True) is False:
+            continue
+        start, end = max(start, ead_start), min(end, today)
+        if start <= end and hours > 0 and (not args.stem or hours >= 20):
+            active.append((job, start, end, hours))
+
+    # Standard post-completion OPT combines concurrent qualifying roles. STEM
+    # retains its per-employer minimum; two 10-hour roles do not satisfy it.
+    employed_days = set()
+    counted_jobs = set()
+    day = ead_start
+    while day <= today:
+        roles = [(i, item) for i, item in enumerate(active) if item[1] <= day <= item[2]]
+        if sum(item[3] for _, item in roles) >= 20:
+            employed_days.add(day)
+            counted_jobs.update(i for i, _ in roles)
+        day += timedelta(days=1)
 
     total = (today - ead_start).days + 1
     used = total - len(employed_days)
@@ -218,13 +238,12 @@ def unemployment(args):
     run_out = today + timedelta(days=max(left, 0)) if left > 0 else today
     result = {"status": status, "limit": limit, "used": used, "left": max(left, 0),
               "runs_out_if_still_unemployed": run_out,
-              "jobs_counted": [j for j in jobs if float(j.get("hours_per_week", 0)) >= 20]}
+              "jobs_counted": [active[i][0] for i in sorted(counted_jobs)]}
     lines = [line, f"Used: {used} (since {fmt(ead_start)})"]
     if left > 0:
         lines.append(f"If you stay unemployed, you hit the limit on {fmt(run_out)}.")
-    skipped = [j for j in jobs if float(j.get("hours_per_week", 0)) < 20]
-    if skipped:
-        lines.append("Jobs under 20 hours a week don't count as employment: " + ", ".join(j.get("employer", "?") for j in skipped))
+    lines.append("STEM OPT uses the per-employer 20-hour minimum." if args.stem else
+                 "Regular post-completion OPT combines hours only across concurrent qualifying jobs.")
     emit(args, result, lines)
 
 
@@ -330,6 +349,10 @@ def travel(args):
     signed = parse_date(args.signed, "--signed")
     ret = parse_date(args.return_date, "--return-date")
     today = parse_date(args.today, "--today")
+    if signed > today:
+        fail("travel signature date cannot be in the future; confirm the actual signed date")
+    if signed > ret:
+        fail("travel signature must be dated on or before the return date")
     valid_until = add_months(signed, 6 if args.on_opt else 12)
     if args.i20_end:
         valid_until = min(valid_until, parse_date(args.i20_end, "--i20-end"))

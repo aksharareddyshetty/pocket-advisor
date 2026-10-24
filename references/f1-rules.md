@@ -89,7 +89,10 @@ Explain the possible route supported by the sources, the facts still needed, and
 - The student picks a start date within 60 days after the program end date. It cannot be changed after filing.
 - No work until the EAD is in hand and its start date has arrived.
 - Unemployment limit: 90 days total during the 12 months. Unemployment days start counting on the EAD start date.
-  Jobs under 20 hours a week count as unemployed.
+  For regular post-completion OPT, combine hours across simultaneous qualifying jobs; a total below 20 hours
+  does not meet the employment threshold. STEM OPT applies the 20-hour minimum per employer, not across employers.
+  Sources: https://ois.usc.edu/employment/post-completion-opt/ and https://ois.usc.edu/employment/stem-opt-extension/.
+  Confirm qualifying employment and reporting with the DSO; a date/hour calculation does not establish authorization.
 - Report employer, job and address changes within 10 days (SEVP Portal for employer info at ASU).
 
 ## 6. STEM OPT extension

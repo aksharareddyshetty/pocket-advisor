@@ -31,7 +31,11 @@ def output(fn, **args):
 
 
 def section(code, **extra):
-    return dict(course=code, credits=3, mode='in_person', satisfies=['core'], **extra)
+    result = dict(course=code, credits=3, mode='in_person', satisfies=['core'],
+                  days='M', start=f'{8 + sum(map(ord, code)) % 12:02d}:00',
+                  end=f'{9 + sum(map(ord, code)) % 12:02d}:00')
+    result.update(extra)
+    return result
 
 
 class FilingTests(unittest.TestCase):

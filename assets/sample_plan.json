@@ -18,7 +18,7 @@
     {"course": "ECN 212", "title": "Microeconomic Principles", "section": "A", "credits": 3, "mode": "in_person", "days": "MW", "start": "09:00", "end": "10:15", "satisfies": ["major-core"], "seats_open": 12},
     {"course": "ECN 212", "title": "Microeconomic Principles", "section": "B", "credits": 3, "mode": "in_person", "days": "TTh", "start": "16:30", "end": "17:45", "satisfies": ["major-core"], "seats_open": 30},
     {"course": "ECN 360", "title": "Economics of Sustainability", "section": "A", "credits": 3, "mode": "in_person", "days": "TTh", "start": "10:30", "end": "11:45", "satisfies": ["major-core", "sust"], "seats_open": 8},
-    {"course": "SOS 110", "title": "Sustainable World", "section": "A", "credits": 3, "mode": "icourse", "days": "", "satisfies": ["sust"], "seats_open": 50},
+    {"course": "SOS 110", "title": "Sustainable World", "section": "A", "credits": 3, "mode": "icourse", "asynchronous": true, "days": "", "satisfies": ["sust"], "seats_open": 50},
     {"course": "MAT 210", "title": "Brief Calculus", "section": "A", "credits": 3, "mode": "in_person", "days": "MWF", "start": "10:30", "end": "11:20", "satisfies": ["math"], "seats_open": 4},
     {"course": "MAT 210", "title": "Brief Calculus", "section": "B", "credits": 3, "mode": "sync", "days": "TTh", "start": "13:30", "end": "14:45", "satisfies": ["math"], "seats_open": 20},
     {"course": "ENG 220", "title": "Intro to Creative Writing", "section": "A", "credits": 3, "mode": "in_person", "days": "MW", "start": "13:30", "end": "14:45", "satisfies": ["huad"], "seats_open": 6},
