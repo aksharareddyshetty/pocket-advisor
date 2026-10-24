@@ -29,6 +29,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from enrollment_rules import assess
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 IN_PERSON_MODES = {"in_person", "hybrid", "immersion"}
@@ -60,13 +61,20 @@ def minutes(hhmm, name):
     m = re.fullmatch(r"(\d{1,2}):(\d{2})", hhmm or "")
     if not m:
         fail(f"{name} must be HH:MM in 24-hour time, got {hhmm!r}")
-    return int(m.group(1)) * 60 + int(m.group(2))
+    hour, minute = int(m.group(1)), int(m.group(2))
+    if hour > 23 or minute > 59:
+        fail(f"{name} is not a valid clock time")
+    return hour * 60 + minute
 
 
 def meeting(item, name):
     if not item.get("days"):
         return None
-    return (parse_days(item["days"]), minutes(item.get("start"), f"{name} start"), minutes(item.get("end"), f"{name} end"))
+    start = minutes(item.get("start"), f"{name} start")
+    end = minutes(item.get("end"), f"{name} end")
+    if end <= start:
+        fail(f"{name} meeting must end after it starts")
+    return (parse_days(item["days"]), start, end)
 
 
 def clash(a, b):
@@ -103,6 +111,8 @@ def plan(data, top):
     for i, s in enumerate(data.get("sections", [])):
         if s.get("seats_open") is not None and int(s["seats_open"]) <= 0:
             continue
+        if (min_credits or min_in_person or max_online is not None) and s.get("mode") not in IN_PERSON_MODES | {"online", "icourse", "sync"}:
+            fail(f"confirm delivery mode for {s['course']} before checking enrollment")
         m = meeting(s, f"section {s.get('course')}")
         if any(clash(m, a) for a in avoid):
             continue
@@ -116,6 +126,8 @@ def plan(data, top):
     for s in sections:
         by_course.setdefault(s["_code"], []).append(s)
     missing = must - set(by_course)
+    if missing:
+        fail("required courses have no open section fitting busy times: " + ", ".join(sorted(missing)), 3)
     courses = sorted(by_course, key=lambda c: (c not in must, -max(len(s["_sat"]) for s in by_course[c])))
 
     def score(chosen):
@@ -130,9 +142,14 @@ def plan(data, top):
         return (musts, covered, doubles, -abs(target - credits), -len(chosen))
 
     def rules_ok(chosen):
+        if not must.issubset({s["_code"] for s in chosen}):
+            return False
         credits = sum(float(s["credits"]) for s in chosen)
-        in_person = sum(float(s["credits"]) for s in chosen if s.get("mode", "in_person") in IN_PERSON_MODES)
-        online = credits - in_person
+        in_person = sum(float(s["credits"]) for s in chosen if s.get("mode", "unknown") in IN_PERSON_MODES)
+        online = sum(float(s["credits"]) for s in chosen if s.get("mode") in {"online", "icourse", "sync"})
+        if (min_credits or min_in_person or max_online is not None) and any(
+                s.get("mode") not in IN_PERSON_MODES | {"online", "icourse", "sync"} for s in chosen):
+            return False
         counted = in_person + (min(online, float(max_online)) if max_online is not None else online)
         return counted >= min_credits and in_person >= min_in_person
 
@@ -167,7 +184,9 @@ def plan(data, top):
 
     walk(0, [], 0.0)
     if not best:
-        fail("no schedule meets the credit and full-time rules with these sections", 3)
+        if nodes > MAX_NODES:
+            fail("search limit reached; narrow the candidate sections and try again", 3)
+        fail("no schedule meets required courses, conflicts, credit cap and enrollment totals; do not loosen visa rules without DSO approval", 3)
 
     # Keep plans that differ in their courses, not just sections.
     seen, picks = set(), []
@@ -188,7 +207,7 @@ def plan(data, top):
             for rid in s["_sat"]:
                 filled[rid] = filled.get(rid, 0) + 1
         still_open = [reqs[r].get("label", r) for r in need if filled.get(r, 0) < need[r]]
-        in_person = sum(float(s["credits"]) for s in chosen if s.get("mode", "in_person") in IN_PERSON_MODES)
+        in_person = sum(float(s["credits"]) for s in chosen if s.get("mode", "unknown") in IN_PERSON_MODES)
         chosen_codes = {s["_code"] for s in chosen}
         optional = []
         for code in courses:
@@ -199,13 +218,18 @@ def plan(data, top):
                     optional.append({"course": s["course"], "section": s.get("section"),
                                      "credits": s["credits"], "fills": s["_sat"]})
                     break
+        try:
+            enrollment = assess(chosen, min_credits, min_in_person, max_online, data.get("term_start"), data.get("term_end")) if (min_credits or min_in_person or max_online is not None) else None
+        except (ValueError, KeyError, TypeError) as exc:
+            fail(f"invalid session data: {exc}")
         out.append({
+            "enrollment_check": enrollment,
             "credits": credits,
             "in_person_credits": in_person,
             "room_under_cap": cap - credits,
             "classes": [{
                 "course": s["course"], "title": s.get("title"), "section": s.get("section"),
-                "credits": s["credits"], "mode": s.get("mode", "in_person"),
+                "credits": s["credits"], "mode": s.get("mode", "unknown"),
                 "when": f"{s['days']} {s['start']}-{s['end']}" if s.get("days") else "online, no set time",
                 "fills": [reqs[r].get("label", r) for r in s["_sat"] if filled[r] <= need[r]] or
                          [reqs[r].get("label", r) for r in s["_sat"]],
@@ -229,7 +253,13 @@ def text(result):
     lines = []
     if result["must_take_unavailable"]:
         lines.append("No open section fits for: " + ", ".join(result["must_take_unavailable"]))
+    if not result["searched_all"]:
+        lines.append("Search limit reached: these are candidate plans, not a complete search.")
     for n, p in enumerate(result["plans"], 1):
+        check = p.get("enrollment_check")
+        if check and check["full_time"] is not True:
+            lines.append("Provisional: confirm session dates/rules and enrollment with your DSO before registering.")
+            lines.extend("  - " + item for item in check["needs_information"] + check["problems"])
         lines.append(f"Option {n}: {p['credits']:g} credits ({p['in_person_credits']:g} in person), {p['room_under_cap']:g} under the cap")
         for c in p["classes"]:
             fills = f" fills {' + '.join(c['fills'])}" if c["fills"] else ""
