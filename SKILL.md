@@ -1,6 +1,6 @@
 ---
 name: pocket-advisor
-description: Finds university-specific F-1 guidance, prepares adviser questions, monitors agreed sources, and plans classes for students. Use for OPT, CPT, I-20, EAD, DSO, international student work, enrollment changes, work-hour checks, travel signatures, or selecting next term's classes from degree requirements. Combines current official sources with date and credit calculations, consent-based reminders and optional explanatory video links. ASU is the worked example; other schools need verification. Not for study schedules or emails to professors.
+description: A proactive advisor for F-1 international students and class planning that keeps watch and texts first when something needs attention. After one setup chat and the student's consent, it checks agreed email, calendar and official rule pages on a schedule and flags job offers that may need work authorization, flights that outlast a travel signature, rule changes, work-hour limits, and OPT, drop or registration deadlines, with optional explanatory video links. Use when a student wants someone to keep an eye on their F-1 status, or mentions OPT, CPT, I-20, EAD, DSO, international student work, enrollment changes, work hours, travel signatures, or choosing next term's classes from degree requirements. Combines current official sources with date and credit calculations. ASU is the worked example; other schools need verification. Not for study schedules or emails to professors.
 ---
 
 # Pocket Advisor
