@@ -1,0 +1,29 @@
+{
+  "_note": "Made-up sample data for trying the script. Real sections come from the school's class search.",
+  "credit_cap": 18,
+  "target_credits": 15,
+  "min_credits": 12,
+  "min_in_person": 9,
+  "max_online_credits": 3,
+  "requirements": [
+    {"id": "major-core", "label": "Economics major core", "courses_needed": 2},
+    {"id": "math", "label": "MATH", "courses_needed": 1},
+    {"id": "sust", "label": "SUST (Sustainability)", "courses_needed": 1},
+    {"id": "huad", "label": "HUAD (Humanities, Arts and Design)", "courses_needed": 2},
+    {"id": "scit", "label": "SCIT (Scientific Thinking)", "courses_needed": 2}
+  ],
+  "must_take": ["ECN 212"],
+  "avoid_times": [{"days": "TTh", "start": "16:30", "end": "20:00", "label": "campus job"}],
+  "sections": [
+    {"course": "ECN 212", "title": "Microeconomic Principles", "section": "A", "credits": 3, "mode": "in_person", "days": "MW", "start": "09:00", "end": "10:15", "satisfies": ["major-core"], "seats_open": 12},
+    {"course": "ECN 212", "title": "Microeconomic Principles", "section": "B", "credits": 3, "mode": "in_person", "days": "TTh", "start": "16:30", "end": "17:45", "satisfies": ["major-core"], "seats_open": 30},
+    {"course": "ECN 360", "title": "Economics of Sustainability", "section": "A", "credits": 3, "mode": "in_person", "days": "TTh", "start": "10:30", "end": "11:45", "satisfies": ["major-core", "sust"], "seats_open": 8},
+    {"course": "SOS 110", "title": "Sustainable World", "section": "A", "credits": 3, "mode": "icourse", "days": "", "satisfies": ["sust"], "seats_open": 50},
+    {"course": "MAT 210", "title": "Brief Calculus", "section": "A", "credits": 3, "mode": "in_person", "days": "MWF", "start": "10:30", "end": "11:20", "satisfies": ["math"], "seats_open": 4},
+    {"course": "MAT 210", "title": "Brief Calculus", "section": "B", "credits": 3, "mode": "sync", "days": "TTh", "start": "13:30", "end": "14:45", "satisfies": ["math"], "seats_open": 20},
+    {"course": "ENG 220", "title": "Intro to Creative Writing", "section": "A", "credits": 3, "mode": "in_person", "days": "MW", "start": "13:30", "end": "14:45", "satisfies": ["huad"], "seats_open": 6},
+    {"course": "ART 100", "title": "Intro to Drawing", "section": "A", "credits": 3, "mode": "in_person", "days": "MW", "start": "09:00", "end": "10:15", "satisfies": ["huad"], "seats_open": 0},
+    {"course": "BIO 100", "title": "The Living World", "section": "A", "credits": 4, "mode": "in_person", "days": "MWF", "start": "12:00", "end": "13:15", "satisfies": ["scit"], "seats_open": 15},
+    {"course": "GLG 101", "title": "Intro to Geology", "section": "A", "credits": 4, "mode": "hybrid", "days": "F", "start": "14:00", "end": "16:45", "satisfies": ["scit", "sust"], "seats_open": 9}
+  ]
+}
