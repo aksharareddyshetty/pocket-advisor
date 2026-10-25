@@ -31,13 +31,16 @@ I only text when something needs you. Say yes, or pick the ones you want.
 
 Check-in wording:
 
-> Pocket Advisor morning sweep for <student>. First retrieve queued email IDs with `python3 scripts/watch.py pending --kind email` and retry them. Then search email from the last 7 days (extend back to the last successful sweep after an outage) for (a) job or
+> Pocket Advisor morning sweep for <student>. First retrieve queued email IDs with `python3 scripts/watch.py pending --kind email` and retry them. Then search email received since the last successful sweep (at most the last 7 days on the first run; extend back further only after an outage) for (a) job or
 > internship offers, recruiter emails and interview invitations, (b) flight or travel bookings, (c) mail from USCIS,
 > SEVP or <school international office>, (d) registration or drop deadline notices. For each item, run
 > `python3 scripts/watch.py seen --kind email --id "<message id>"` and skip it if the exit code is 1 (already handled). Exit 0 queues it without marking it handled.
 > Handle it as section 1 describes. Only after successful processing and delivery of any required alert, run
 > `python3 scripts/watch.py seen --kind email --id "<message id>" --mark`. On failure leave it pending.
 > Do not advance the sweep time when email search is incomplete; queue each discovered item before advancing it. Record the last successful complete sweep time in Cubbie memory. Text only for actionable items.
+> Keep it quick: run one targeted search per category with sender and subject keywords (offer, internship,
+> interview, itinerary, booking, confirmation, USCIS, SEVP, <school international office>), open only the
+> messages that match, and skip newsletters and promotions.
 
 How to handle each kind:
 
@@ -70,6 +73,10 @@ python3 scripts/watch.py add --name "USCIS I-765" --url https://www.uscis.gov/i-
 ```
 
 Use the school profile's links (`schools.md`). The first run saves a baseline. Later changes remain pending until explicitly acknowledged after review.
+
+On the first run, send one short text and nothing else: "Saved today's versions of <n> rule pages. I'll compare
+them every Monday and text you only if something changes for you." Name any page that could not be saved in the
+same text. Do not summarize the pages' contents on a baseline run.
 
 Check-in wording:
 
